@@ -929,6 +929,7 @@ export default function FuriDuel() {
         dashCd: 0,
         inv: 0, // 被弾直後の無敵（弾にも有効）
         dashInv: 0, // 回避の無敵（斬撃と衝撃波にのみ有効。弾には効かない）
+        hitFlash: 0, // 被弾時の点滅演出。パリィ成功時の無敵では点滅させない
         parry: 0,
         parryCd: 0,
         melee: 0,
@@ -976,6 +977,7 @@ export default function FuriDuel() {
       G.p.dashCd = 0;
       G.p.inv = 0.8;
       G.p.dashInv = 0;
+      G.p.hitFlash = 0;
       G.p.parry = 0;
       G.p.parryCd = 0;
       G.p.combo = 0;
@@ -1140,6 +1142,7 @@ export default function FuriDuel() {
       if (dodgeable && G.p.dashInv > 0) return;
       G.p.hp -= n;
       G.p.inv = HIT_IFRAME;
+      G.p.hitFlash = HIT_IFRAME;
       G.shake = 0.7;
       flash("#ff2e6e", 0.5);
       if (G.p.hp <= 0) {
@@ -1632,6 +1635,7 @@ export default function FuriDuel() {
       P.shoot -= dt;
       P.inv -= dt;
       P.dashInv -= dt;
+      P.hitFlash -= dt;
       if (P.parry > 0) P.parry -= dt;
 
       // カメラ前方 f と、その画面右 r = cross(f, up)
@@ -1954,8 +1958,9 @@ export default function FuriDuel() {
       playerMesh.position.set(G.p.x, 0, G.p.z);
       playerMesh.rotation.y = G.p.face + PLAYER_MODEL_FACING_OFFSET;
       pAura.position.set(G.p.x, 0.05, G.p.z);
-      // 無敵中は本体を点滅させて示す（モデルはPBRマテリアルなので発光値ではなく可視/不可視で表現）
-      playerMesh.visible = G.p.inv > 0 ? Math.sin(now * 0.03) > -0.2 : true;
+      // 被弾直後だけ本体を点滅させて示す（モデルはPBRマテリアルなので発光値ではなく可視/不可視で表現）。
+      // パリィ成功時の無敵（G.p.inv）では点滅させない。
+      playerMesh.visible = G.p.hitFlash > 0 ? Math.sin(now * 0.03) > -0.2 : true;
       pAura.material.color.setHex(G.p.parry > 0 ? C.parry : C.player);
       pAura.material.opacity = G.p.parry > 0 ? 0.9 : 0.3;
 
@@ -2434,7 +2439,7 @@ export default function FuriDuel() {
             style={{
               position: "absolute",
               left: 24,
-              bottom: "calc(30px + env(safe-area-inset-bottom, 0px))",
+              bottom: "calc(66px + env(safe-area-inset-bottom, 0px))",
               width: 132,
               height: 132,
               borderRadius: "50%",
@@ -2459,36 +2464,37 @@ export default function FuriDuel() {
             />
           </div>
 
-          {/* 十字配置。親指が届きやすいよう、よく使う斬/避を内側かつ下寄りにする */}
+          {/* 十字配置。親指が届きやすいよう、よく使う斬/避を内側かつ下寄りにする。
+              各ボタンは中心へ寄せて配置し、ボタン同士の間隔を詰めている */}
           <div
             style={{
               position: "absolute",
               right: 18,
-              bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+              bottom: "calc(60px + env(safe-area-inset-bottom, 0px))",
               width: 206,
               height: 206,
             }}
           >
             {/* 上: 射撃 */}
-            <div style={{ position: "absolute", left: 68, top: 0 }}>
+            <div style={{ position: "absolute", left: 68, top: 14 }}>
               <div {...press("shoot")} style={btn("rgba(127,247,232,0.22)", 70)}>
                 撃
               </div>
             </div>
             {/* 左: 斬撃 */}
-            <div style={{ position: "absolute", left: 0, top: 66 }}>
+            <div style={{ position: "absolute", left: 14, top: 66 }}>
               <div {...press("slash")} style={btn("rgba(255,46,110,0.30)", 74)}>
                 斬
               </div>
             </div>
             {/* 右: パリィ */}
-            <div style={{ position: "absolute", left: 136, top: 66 }}>
+            <div style={{ position: "absolute", left: 122, top: 66 }}>
               <div {...press("parry")} style={btn("rgba(255,216,77,0.28)", 70)}>
                 受
               </div>
             </div>
             {/* 下: 回避 */}
-            <div style={{ position: "absolute", left: 68, top: 136 }}>
+            <div style={{ position: "absolute", left: 68, top: 122 }}>
               <div {...press("dash")} style={btn("rgba(108,76,255,0.35)", 70)}>
                 避
               </div>

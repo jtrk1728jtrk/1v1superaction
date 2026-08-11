@@ -131,25 +131,25 @@ async function loadAssets(onProgress) {
 
 const STAGES = [
   {
-    name: "獄卒",
+    name: "Shadow",
     kit: "warden",
     tint: 0xff2e6e,
     scale: 2.5,
     phases: [
-      { name: "第一相", sub: "遠 — 弾幕", hp: 110, melee: 0.22, speed: 1.0 },
-      { name: "第二相", sub: "近 — 斬撃", hp: 130, melee: 0.88, speed: 1.08 },
-      { name: "終相", sub: "混沌", hp: 155, melee: 0.72, speed: 1.22 },
+      { name: "Phase 1", sub: "遠 — 弾幕", hp: 110, melee: 0.22, speed: 1.0 },
+      { name: "Phase 2", sub: "近 — 斬撃", hp: 130, melee: 0.88, speed: 1.08 },
+      { name: "Phase 3", sub: "混沌", hp: 155, melee: 0.72, speed: 1.22 },
     ],
   },
   {
-    name: "審問官",
+    name: "Judge",
     kit: "inquisitor",
     tint: 0x8b5cf6,
     scale: 2.9,
     phases: [
-      { name: "第一相", sub: "光条", hp: 130, melee: 0.12, speed: 1.0 },
-      { name: "第二相", sub: "追尾と伏火", hp: 155, melee: 0.28, speed: 1.1 },
-      { name: "終相", sub: "断罪", hp: 185, melee: 0.5, speed: 1.25 },
+      { name: "Phase 1", sub: "光条", hp: 130, melee: 0.12, speed: 1.0 },
+      { name: "Phase 2", sub: "追尾と伏火", hp: 155, melee: 0.28, speed: 1.1 },
+      { name: "Phase 3", sub: "断罪", hp: 185, melee: 0.5, speed: 1.25 },
     ],
   },
 ];
@@ -2104,6 +2104,17 @@ export default function FuriDuel() {
         setBanner({ big: STAGES[0].name, small: STAGES[0].phases[0].sub });
         setTimeout(() => setBanner(null), 1400);
       },
+      // テストプレイ用: 指定したステージ・Phaseから開始する
+      startAt: (stageIdx, phaseIdx) => {
+        G.stage = stageIdx;
+        applyStageLook();
+        resetPhase(phaseIdx);
+        setBanner({
+          big: STAGES[stageIdx].name,
+          small: STAGES[stageIdx].phases[phaseIdx].sub,
+        });
+        setTimeout(() => setBanner(null), 1400);
+      },
       retry: () => {
         resetPhase(G.phase);
       },
@@ -2286,6 +2297,24 @@ export default function FuriDuel() {
     }
     setScreen("play");
     apiRef.current && apiRef.current.start();
+  };
+
+  // テストプレイ用: 指定したステージ・Phaseから直接開始する
+  const startAt = (stageIdx, phaseIdx) => {
+    if (!musicRef.current) {
+      try {
+        musicRef.current = createMusic(assets);
+      } catch (e) {
+        musicRef.current = null;
+      }
+    }
+    if (musicRef.current) {
+      musicRef.current.setMuted(!musicOn);
+      musicRef.current.setPhase(phaseIdx);
+      musicRef.current.start();
+    }
+    setScreen("play");
+    apiRef.current && apiRef.current.startAt(stageIdx, phaseIdx);
   };
 
   return (
@@ -2554,6 +2583,8 @@ export default function FuriDuel() {
             justifyContent: "center",
             padding: 28,
             textAlign: "center",
+            overflowY: "auto",
+            touchAction: "auto",
           }}
         >
           {screen === "loading" && (
@@ -2576,7 +2607,7 @@ export default function FuriDuel() {
                   lineHeight: 1.1,
                 }}
               >
-                獄卒
+                Shadow
               </div>
               <div
                 style={{
@@ -2629,7 +2660,7 @@ export default function FuriDuel() {
                   lineHeight: 1.1,
                 }}
               >
-                獄卒
+                Shadow
               </div>
               <div
                 style={{
@@ -2658,6 +2689,47 @@ export default function FuriDuel() {
               >
                 開始
               </div>
+
+              {/* ---- テストプレイ用: ステージ選択 ---- */}
+              <div
+                style={{
+                  marginTop: 26,
+                  fontSize: 10,
+                  letterSpacing: "0.2em",
+                  opacity: 0.5,
+                }}
+              >
+                — テストプレイ: ステージ選択 —
+              </div>
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  alignItems: "center",
+                }}
+              >
+                {STAGES.map((st, si) => (
+                  <div key={si} style={{ display: "flex", gap: 6 }}>
+                    {st.phases.map((ph, pi) => (
+                      <div
+                        key={pi}
+                        onClick={() => startAt(si, pi)}
+                        style={{
+                          padding: "6px 12px",
+                          border: "1px solid rgba(237,230,255,0.3)",
+                          fontSize: 11,
+                          letterSpacing: "0.1em",
+                          opacity: 0.75,
+                        }}
+                      >
+                        {st.name} {ph.name}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </>
           )}
           {screen === "dead" && (
@@ -2681,7 +2753,7 @@ export default function FuriDuel() {
                   fontSize: 14,
                 }}
               >
-                再挑戦
+                Continue
               </div>
             </>
           )}

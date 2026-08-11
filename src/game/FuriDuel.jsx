@@ -882,11 +882,12 @@ export default function FuriDuel() {
         dmg: 1,
         owner: "boss",
         hard: false,
+        noSlash: false,
         homing: 0,
         life: 0,
       });
     }
-    function spawnBullet(x, z, vx, vz, owner, dmg, hard) {
+    function spawnBullet(x, z, vx, vz, owner, dmg, hard, noSlash) {
       for (let i = 0; i < MAXB; i++) {
         const b = bullets[i];
         if (b.alive) continue;
@@ -898,6 +899,7 @@ export default function FuriDuel() {
         b.owner = owner;
         b.dmg = dmg;
         b.hard = owner === "boss" ? !!hard : false;
+        b.noSlash = owner === "boss" ? !!noSlash : false;
         b.homing = 0;
         b.r = owner === "boss" ? (b.hard ? R_HARD : R_SOFT) : 0.32;
         b.life = 7;
@@ -1438,7 +1440,7 @@ export default function FuriDuel() {
           const base = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
           for (let i = 0; i < n; i++) {
             const a = base + (i - (n - 1) / 2) * 0.55;
-            const b = spawnBullet(G.b.x, G.b.z, Math.sin(a) * 9, Math.cos(a) * 9, "boss", 1, false);
+            const b = spawnBullet(G.b.x, G.b.z, Math.sin(a) * 9, Math.cos(a) * 9, "boss", 1, false, true);
             if (b) b.homing = 1.9;
           }
           bossOneShotPlay(BCLIP.shoot, 1.4);
@@ -1750,10 +1752,10 @@ export default function FuriDuel() {
             G.hitStop = big ? 0.12 : 0.07;
             G.shake = Math.max(G.shake, big ? 0.6 : 0.35);
           }
-          // 斬撃も「消せる弾」だけを払える。消せない弾は残る
+          // 斬撃も「消せる弾」だけを払える。消せない弾や斬撃無効の弾は残る
           for (let i = 0; i < MAXB; i++) {
             const b = bullets[i];
-            if (!b.alive || b.owner !== "boss" || b.hard) continue;
+            if (!b.alive || b.owner !== "boss" || b.hard || b.noSlash) continue;
             if (dist(b.x, b.z, P.x, P.z) < MELEE_RANGE) {
               b.alive = false;
               b.mesh.visible = false;

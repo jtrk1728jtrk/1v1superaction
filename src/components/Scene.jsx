@@ -6,6 +6,7 @@ import OrbitControls from './OrbitControls'
 import { assetUrl } from '../utils/assetPath'
 
 const PLAYER_MODEL_URL = assetUrl('models/player.glb')
+const BOSS_MODEL_URL = assetUrl('models/boss.glb')
 
 export default function Scene() {
   return (
@@ -21,9 +22,23 @@ export default function Scene() {
 
       {/* プレイヤーモデル: /public/assets/models/player.glb をまだ配置していない間は
           プレースホルダーのワイヤーフレームを表示する */}
-      <ModelLoadBoundary label="player" fallback={<PlaceholderMarker position={[0, 0.9, 0]} />}>
-        <Suspense fallback={<PlaceholderMarker position={[0, 0.9, 0]} />}>
-          <GltfModel url={PLAYER_MODEL_URL} position={[0, 0, 0]} />
+      <ModelLoadBoundary
+        label="player"
+        fallback={<PlaceholderMarker position={[-2, 0.9, 0]} />}
+      >
+        <Suspense fallback={<PlaceholderMarker position={[-2, 0.9, 0]} />}>
+          <GltfModel url={PLAYER_MODEL_URL} position={[-2, 0, 0]} rotation={[0, Math.PI / 2, 0]} />
+        </Suspense>
+      </ModelLoadBoundary>
+
+      {/* ボスモデル: /public/assets/models/boss.glb をまだ配置していない間は
+          プレースホルダーのワイヤーフレームを表示する */}
+      <ModelLoadBoundary
+        label="boss"
+        fallback={<PlaceholderMarker color="#4d9dff" position={[2, 0.9, 0]} />}
+      >
+        <Suspense fallback={<PlaceholderMarker color="#4d9dff" position={[2, 0.9, 0]} />}>
+          <GltfModel url={BOSS_MODEL_URL} position={[2, 0, 0]} rotation={[0, -Math.PI / 2, 0]} />
         </Suspense>
       </ModelLoadBoundary>
 

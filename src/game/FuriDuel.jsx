@@ -2276,10 +2276,10 @@ export default function FuriDuel() {
 
   return (
     <div
+      className="fd-root"
       style={{
         position: "relative",
         width: "100%",
-        height: "100vh",
         background: "#0b0620",
         overflow: "hidden",
         fontFamily:
@@ -2434,7 +2434,7 @@ export default function FuriDuel() {
             style={{
               position: "absolute",
               left: 24,
-              bottom: 30,
+              bottom: "calc(30px + env(safe-area-inset-bottom, 0px))",
               width: 132,
               height: 132,
               borderRadius: "50%",
@@ -2464,7 +2464,7 @@ export default function FuriDuel() {
             style={{
               position: "absolute",
               right: 18,
-              bottom: 24,
+              bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
               width: 206,
               height: 206,
             }}

@@ -13,3 +13,11 @@ body,
   color: #f0f0f0;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+
+/* モバイルではアドレスバー等の分だけ 100vh が実表示領域より大きくなり、
+   下端固定のUIが画面外にはみ出すことがある。dvh に対応するブラウザでは
+   実際に見えている高さに追随させる（非対応ブラウザは vh のまま）。 */
+.fd-root {
+  height: 100vh;
+  height: 100dvh;
+}

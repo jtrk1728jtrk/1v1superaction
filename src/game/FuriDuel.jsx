@@ -1396,7 +1396,7 @@ export default function FuriDuel() {
             G.shake = Math.max(G.shake, 0.4);
           }
         } else if (A.s === 1) {
-          A.a += dt * (G.phase >= 2 ? 1.15 : 0.85) * A.dir * sp;
+          A.a += dt * (G.phase >= 2 ? 2.6 : 2.0) * A.dir * sp; // 歩きだけでは避けきれない速さ。回避ステップ推奨
           for (let i = 0; i < arms; i++) {
             const b = beams[i];
             b.live = true;

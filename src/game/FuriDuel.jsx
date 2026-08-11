@@ -103,9 +103,6 @@ const CLIP = {
 /* ------------------------------------------------------------------
    素材読み込み: /public/assets 配下のglTF(.glb)・音声(.mp3)を
    外部ファイルとしてfetchする。コードへの埋め込みは行わない。
-   効果音ファイルは1種類(se_attack.mp3)のみのため、斬撃1〜3段目と
-   パリィの全SFXキーに同じ音を割り当てる。個別の音を用意したい場合は
-   public/assets/audio に追加して下のパスを差し替えればよい。
 ------------------------------------------------------------------ */
 async function loadAssets(onProgress) {
   const get = async (label, path) => {
@@ -118,12 +115,15 @@ async function loadAssets(onProgress) {
   const playerGlb = await get("主人公モデル", "models/player.glb");
   const bossGlb = await get("ボスモデル", "models/boss.glb");
   const bgm = await get("BGM", "audio/bgm.mp3");
-  const attackSfx = await get("効果音", "audio/se_attack.mp3");
+  const slash1 = await get("効果音(斬撃1段目)", "audio/slash1.mp3");
+  const slash2 = await get("効果音(斬撃2段目)", "audio/slash2.mp3");
+  const slash3 = await get("効果音(斬撃3段目)", "audio/slash3.mp3");
+  const parry = await get("効果音(パリィ)", "audio/parry.mp3");
   return {
     playerGlb,
     bossGlb,
     bgm,
-    sfx: { slash1: attackSfx, slash2: attackSfx, slash3: attackSfx, parry: attackSfx },
+    sfx: { slash1, slash2, slash3, parry },
   };
 }
 

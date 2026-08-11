@@ -119,11 +119,12 @@ async function loadAssets(onProgress) {
   const slash2 = await get("効果音(斬撃2段目)", "audio/slash2.mp3");
   const slash3 = await get("効果音(斬撃3段目)", "audio/slash3.mp3");
   const parry = await get("効果音(パリィ)", "audio/parry.mp3");
+  const dash = await get("効果音(回避)", "audio/dash.mp3");
   return {
     playerGlb,
     bossGlb,
     bgm,
-    sfx: { slash1, slash2, slash3, parry },
+    sfx: { slash1, slash2, slash3, parry, dash },
   };
 }
 
@@ -205,6 +206,7 @@ function createMusic(assets) {
   decodeInto(assets.sfx.slash2, "slash2");
   decodeInto(assets.sfx.slash3, "slash3");
   decodeInto(assets.sfx.parry, "parry");
+  decodeInto(assets.sfx.dash, "dash");
 
   let buffer = null;
   let source = null;
@@ -272,13 +274,14 @@ function createMusic(assets) {
       sfxGain.gain.value = muted ? 0 : 0.85;
       ramp(0.3);
     },
-    playSfx(key, vol) {
+    playSfx(key, vol, rate) {
       if (muted || disposed) return;
       const b = sfxBuffers[key];
       if (!b) return;
       if (ctx.state === "suspended") ctx.resume();
       const s = ctx.createBufferSource();
       s.buffer = b;
+      if (rate != null && rate !== 1) s.playbackRate.value = rate;
       if (vol != null && vol !== 1) {
         const g = ctx.createGain();
         g.gain.value = vol;
@@ -1698,6 +1701,7 @@ export default function FuriDuel() {
         P.dashInv = Math.max(P.dashInv, DASH_IFRAME);
         P.dashCd = DASH_CD;
         triggerOneShot(CLIP.dodge, 3.6, false); // 1.33s のクリップを約0.37sに圧縮（硬直短縮に合わせる）
+        if (musicRef.current) musicRef.current.playSfx("dash", 1, 2); // 素材を2倍速で再生
       }
       input.dash = false;
 

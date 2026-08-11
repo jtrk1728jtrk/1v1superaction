@@ -12,3 +12,4 @@ Web Audio API (`AudioContext.decodeAudioData`) でデコード・再生します
 - `slash2.mp3` — 効果音。斬撃2段目
 - `slash3.mp3` — 効果音。斬撃3段目
 - `parry.mp3` — 効果音。パリィ成功時
+- `dash.mp3` — 効果音。回避ステップ時（再生時に2倍速をかけて鳴らしている）

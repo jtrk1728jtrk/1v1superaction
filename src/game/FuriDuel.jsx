@@ -388,11 +388,16 @@ export default function FuriDuel() {
     );
     camera.position.set(0, 12, -16);
 
-    scene.add(new THREE.AmbientLight(0x5a4b9c, 1.0));
-    const key = new THREE.DirectionalLight(0xa78bfa, 0.7);
+    // three.js は物理ベースの光量単位のみに対応しており(旧unitlessモードは廃止)、
+    // 数値の意味が昔と異なる。DirectionalLight/AmbientLightはπ倍、Point/SpotLightは
+    // 4π倍にすると旧unitless表記と同等の明るさになる（公式移行ガイドの換算式）。
+    // これをしないと自己発光(emissive)の色だけが浮いて見え、モデルの陰影が
+    // ほぼ真っ黒になってしまう。
+    scene.add(new THREE.AmbientLight(0x5a4b9c, 1.0 * Math.PI));
+    const key = new THREE.DirectionalLight(0xa78bfa, 0.7 * Math.PI);
     key.position.set(6, 18, -8);
     scene.add(key);
-    const bossLight = new THREE.PointLight(C.boss, 1.6, 40);
+    const bossLight = new THREE.PointLight(C.boss, 1.6 * 4 * Math.PI, 40);
     scene.add(bossLight);
 
     /* ---------------- arena ---------------- */

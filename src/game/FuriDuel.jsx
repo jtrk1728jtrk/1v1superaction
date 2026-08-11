@@ -120,11 +120,12 @@ async function loadAssets(onProgress) {
   const slash3 = await get("効果音(斬撃3段目)", "audio/slash3.mp3");
   const parry = await get("効果音(パリィ)", "audio/parry.mp3");
   const dash = await get("効果音(回避)", "audio/dash.mp3");
+  const shoot = await get("効果音(射撃)", "audio/shoot.mp3");
   return {
     playerGlb,
     bossGlb,
     bgm,
-    sfx: { slash1, slash2, slash3, parry, dash },
+    sfx: { slash1, slash2, slash3, parry, dash, shoot },
   };
 }
 
@@ -207,6 +208,7 @@ function createMusic(assets) {
   decodeInto(assets.sfx.slash3, "slash3");
   decodeInto(assets.sfx.parry, "parry");
   decodeInto(assets.sfx.dash, "dash");
+  decodeInto(assets.sfx.shoot, "shoot");
 
   let buffer = null;
   let source = null;
@@ -1772,6 +1774,7 @@ export default function FuriDuel() {
           "player",
           SHOOT_DMG
         );
+        if (musicRef.current) musicRef.current.playSfx("shoot");
       }
       input.shoot = false;
     }

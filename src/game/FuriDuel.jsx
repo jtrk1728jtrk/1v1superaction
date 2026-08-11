@@ -53,6 +53,9 @@ const PARRY_WINDOW = 0.18; // 受付窓
 const PARRY_CD = 0.45; // 硬直
 const MELEE_RANGE = 4.6;
 const MELEE_ARC = Math.PI * 0.55;
+const SLASH_LUNGE_SPEED = 14; // 斬撃時にわずかに踏み込む速度
+const SLASH_LUNGE_STOP = 3.4; // ここより詰めない（ボスにめり込む＝貫通を防ぐ）
+const COMBO_HOMING = 12; // ボスの連続斬りの踏み込み中の軌道補正の強さ（大きいほど避けにくい）
 const SHOOT_CD = 0.13;
 const SHOOT_DMG = 1.6;
 const BSPEED = 46;
@@ -945,6 +948,7 @@ export default function FuriDuel() {
         comboT: 0,
         hitT: 0, // 命中までの残りタメ時間
         hitStep: 0,
+        lungeT: 0, // 斬撃時にわずかに踏み込む残り時間
       },
       b: {
         x: 0,
@@ -991,6 +995,7 @@ export default function FuriDuel() {
       G.p.comboT = 0;
       G.p.hitT = 0;
       G.p.hitStep = 0;
+      G.p.lungeT = 0;
       G.p.melee = 0;
       G.p.shoot = 0;
       pSlash.scale.setScalar(1);
@@ -1578,9 +1583,20 @@ export default function FuriDuel() {
             A.lz = Math.cos(faceA);
           }
         } else if (A.s === 1) {
-          G.b.x += A.lx * A.lspd * sp * dt;
-          G.b.z += A.lz * A.lspd * sp * dt;
-          clampArena(G.b, 3);
+          // 主人公へ向けて軌道を補正しながら踏み込む（追尾）。
+          // 間合いに入ったら足を止め、通り抜け（貫通）しないようにする
+          const homingA = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
+          const t = Math.min(1, dt * COMBO_HOMING);
+          A.lx += (Math.sin(homingA) - A.lx) * t;
+          A.lz += (Math.cos(homingA) - A.lz) * t;
+          const ll = Math.hypot(A.lx, A.lz) || 1;
+          A.lx /= ll;
+          A.lz /= ll;
+          if (dist(G.b.x, G.b.z, G.p.x, G.p.z) > COMBO_HOLD) {
+            G.b.x += A.lx * A.lspd * sp * dt;
+            G.b.z += A.lz * A.lspd * sp * dt;
+            clampArena(G.b, 3);
+          }
           if (A.timer <= 0) {
             bossSwingHit(); // 踏み込み切ってから判定
             A.s = 2;
@@ -1671,6 +1687,15 @@ export default function FuriDuel() {
           P.x += (mvx / mag) * PLAYER_SPEED * mag * dt;
           P.z += (mvz / mag) * PLAYER_SPEED * mag * dt;
         }
+        // 斬撃中はボスへ向けてわずかに踏み込む。近づきすぎ（貫通）は防ぐ
+        if (P.lungeT > 0) {
+          P.lungeT -= dt;
+          if (dist(P.x, P.z, G.b.x, G.b.z) > SLASH_LUNGE_STOP) {
+            const la = angTo(P.x, P.z, G.b.x, G.b.z);
+            P.x += Math.sin(la) * SLASH_LUNGE_SPEED * dt;
+            P.z += Math.cos(la) * SLASH_LUNGE_SPEED * dt;
+          }
+        }
       }
       clampArena(P, 1.2);
 
@@ -1731,6 +1756,7 @@ export default function FuriDuel() {
         // 振りかぶってから当たる。命中判定はタメ後にまとめて処理する
         P.hitT = step.windup;
         P.hitStep = P.combo;
+        P.lungeT = step.windup + 0.06; // タメ〜命中の間だけ踏み込む
       }
       input.slash = false;
 

@@ -397,7 +397,7 @@ export default function FuriDuel() {
     const key = new THREE.DirectionalLight(0xa78bfa, 0.7 * Math.PI);
     key.position.set(6, 18, -8);
     scene.add(key);
-    const bossLight = new THREE.PointLight(C.boss, 1.6 * 4 * Math.PI, 40);
+    const bossLight = new THREE.PointLight(C.boss, 0.7 * 4 * Math.PI, 40);
     scene.add(bossLight);
 
     /* ---------------- arena ---------------- */
@@ -588,7 +588,7 @@ export default function FuriDuel() {
       bossGroup.scale.setScalar(st.scale);
       bossLight.color.setHex(st.tint);
       bossAura.material.color.setHex(st.tint);
-      setBossTint(st.tint, 0.2);
+      setBossTint(st.tint, 0.08);
     }
 
     function clearInquisitorFxBeams() {
@@ -674,7 +674,7 @@ export default function FuriDuel() {
               // 暗い配色なので少し発光させて闇に沈まないようにする
               if (m.emissive) {
                 m.emissive.setHex(C.boss);
-                m.emissiveIntensity = 0.18;
+                m.emissiveIntensity = 0.08;
               }
               m.needsUpdate = true;
               if (bossMats.indexOf(m) === -1) bossMats.push(m);
@@ -1021,7 +1021,7 @@ export default function FuriDuel() {
       slash.material.opacity = 0;
       pSlash.material.opacity = 0;
       parryFx.material.opacity = 0;
-      setBossTint(bossBaseTint, 0.2);
+      setBossTint(bossBaseTint, 0.08);
       G.shake = 0;
       G.slowT = 0;
       G.timeScale = 1;
@@ -1045,7 +1045,7 @@ export default function FuriDuel() {
         bossBaseAction.setEffectiveWeight(1);
         bossBaseAction.play();
       }
-      setBossTint(bossBaseTint, 0.2);
+      setBossTint(bossBaseTint, 0.08);
       playerOneShot = null;
       if (playerModelReady && playerActions[CLIP.idle]) {
         // 死亡ポーズなどが残らないよう、全アクションを完全に停止してから戻す
@@ -1374,7 +1374,7 @@ export default function FuriDuel() {
             A.timer = 1.1;
             chargeRing.visible = false;
             chargeRing.material.opacity = 0;
-            setBossTint(bossBaseTint, 0.2);
+            setBossTint(bossBaseTint, 0.08);
             G.shake = Math.max(G.shake, 0.6);
             wave.position.set(G.b.x, 0.3, G.b.z);
             wave.material.opacity = 0.9;
@@ -1421,7 +1421,7 @@ export default function FuriDuel() {
           }
           if (A.timer <= 0) {
             clearInquisitorFxBeams();
-            setBossTint(bossBaseTint, 0.2);
+            setBossTint(bossBaseTint, 0.08);
             endAct(0.8);
           }
         }
@@ -1494,7 +1494,7 @@ export default function FuriDuel() {
           }
         } else if (A.timer <= 0) {
           bossGroup.scale.setScalar(curStage().scale);
-          setBossTint(bossBaseTint, 0.2);
+          setBossTint(bossBaseTint, 0.08);
           A.k++;
           if (G.phase >= 2 && A.k < 2) {
             A.s = 0;
@@ -1563,7 +1563,7 @@ export default function FuriDuel() {
             doBossSwing();
           }
         } else if (A.timer <= 0) {
-          setBossTint(bossBaseTint, 0.2);
+          setBossTint(bossBaseTint, 0.08);
           endAct(0.75);
         }
       } else if (A.t === "combo") {
@@ -1610,7 +1610,7 @@ export default function FuriDuel() {
         } else if (A.s === 2 && A.timer <= 0) {
           A.k++;
           if (A.k >= 3) {
-            setBossTint(bossBaseTint, 0.2);
+            setBossTint(bossBaseTint, 0.08);
             endAct(0.95);
           } else {
             A.s = 0;
@@ -1623,7 +1623,7 @@ export default function FuriDuel() {
     function endAct(cool) {
       G.b.act = null;
       G.b.think = cool;
-      setBossTint(bossBaseTint, 0.2);
+      setBossTint(bossBaseTint, 0.08);
     }
 
     const BOSS_SWING_CLIPS = [BCLIP.slash, BCLIP.slash2, BCLIP.slash3];

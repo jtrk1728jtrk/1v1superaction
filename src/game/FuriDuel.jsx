@@ -30,7 +30,7 @@ const ARENA_R = 44; // フィールド半径（従来の2倍）
 const PLAYER_SPEED = 20.5;
 const DASH_SPEED = 38; // 回避の移動速度
 const DASH_TIME = 0.185; // 38 × 0.185 ≒ 7.0 の移動距離になる
-const DASH_IFRAME = 0.3; // 回避中の無敵時間（回避動作より長めに確保）
+const DASH_IFRAME = 0.25; // 回避中の無敵時間（回避動作より長めに確保）
 const DASH_CD = 0.3; // 回避後の硬直（次に回避できるまで）
 const BEAM_LEN = 60; // 光条の長さ
 const BEAM_COUNT = 3; // 同時に出せる光条の本数
@@ -134,6 +134,10 @@ async function loadAssets(onProgress) {
   };
 }
 
+// ボスのHPは1本の連続したゲージ。ラウンド制で相ごとにHPを回復させるのではなく、
+// 残りHPの割合に応じて攻撃パターン（Phase）が自動的に切り替わる。
+// startFrac はテストプレイでそのPhaseを直接選んだ時の開始HP割合。
+const BOSS_HP = 800;
 const STAGES = [
   {
     name: "Shadow",
@@ -141,9 +145,9 @@ const STAGES = [
     tint: 0xff2e6e,
     scale: 2.5,
     phases: [
-      { name: "Phase 1", sub: "遠 — 弾幕", hp: 110, melee: 0.22, speed: 1.0 },
-      { name: "Phase 2", sub: "近 — 斬撃", hp: 130, melee: 0.88, speed: 1.08 },
-      { name: "Phase 3", sub: "混沌", hp: 155, melee: 0.72, speed: 1.22 },
+      { name: "Phase 1", startFrac: 1.0, melee: 0.22, speed: 1.0 },
+      { name: "Phase 2", startFrac: 0.69, melee: 0.88, speed: 1.08 },
+      { name: "Phase 3", startFrac: 0.35, melee: 0.72, speed: 1.22 },
     ],
   },
   {
@@ -152,13 +156,20 @@ const STAGES = [
     tint: 0x8b5cf6,
     scale: 2.9,
     phases: [
-      { name: "Phase 1", sub: "光条", hp: 130, melee: 0.12, speed: 1.0 },
-      { name: "Phase 2", sub: "追尾と伏火", hp: 155, melee: 0.28, speed: 1.1 },
-      { name: "Phase 3", sub: "断罪", hp: 185, melee: 0.5, speed: 1.25 },
+      { name: "Phase 1", startFrac: 1.0, melee: 0.12, speed: 1.0 },
+      { name: "Phase 2", startFrac: 0.69, melee: 0.28, speed: 1.1 },
+      { name: "Phase 3", startFrac: 0.35, melee: 0.5, speed: 1.25 },
     ],
   },
 ];
-const PHASE_COUNT = 3;
+
+// 残りHP割合から、そのタイミングで使うPhase（攻撃パターン）を決める。
+// 100%〜70%=Phase1, 69%〜36%=Phase2, 35%〜撃破まで=Phase3。
+function phaseIndexForFrac(frac) {
+  if (frac >= 0.7) return 0;
+  if (frac >= 0.36) return 1;
+  return 2;
+}
 
 /* ------------------------------------------------------------------
    BGM: 読み込んだmp3を再生する。
@@ -326,13 +337,12 @@ export default function FuriDuel() {
   const [loadErr, setLoadErr] = useState(null);
   const [banner, setBanner] = useState(null);
   const [bannerShow, setBannerShow] = useState(false);
-  const [clearedPhases, setClearedPhases] = useState(() => new Set());
+  const [clearedBosses, setClearedBosses] = useState(() => new Set());
   const apiRef = useRef(null);
 
-  // 通常のステージセレクト（ゲームオーバー画面から）はクリア済みのPhaseだけを選べるようにする
-  function markCleared(stageIdx, phaseIdx) {
-    const key = `${stageIdx}-${phaseIdx}`;
-    setClearedPhases((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  // 通常のステージセレクト（ゲームオーバー画面から）は撃破済みのボスだけを選べるようにする
+  function markCleared(stageIdx) {
+    setClearedBosses((prev) => (prev.has(stageIdx) ? prev : new Set(prev).add(stageIdx)));
   }
 
   // バナー文字をフェードインさせる。マウント直後に opacity を 0→1 にするため
@@ -981,8 +991,8 @@ export default function FuriDuel() {
       b: {
         x: 0,
         z: 22,
-        hp: STAGES[0].phases[0].hp,
-        max: STAGES[0].phases[0].hp,
+        hp: BOSS_HP,
+        max: BOSS_HP,
         face: 0,
         think: 1.2,
         stagger: 0,
@@ -1000,8 +1010,8 @@ export default function FuriDuel() {
       G.phase = idx;
       // 相が進むとBGMのテンポと編成が厚くなる
       if (musicRef.current) musicRef.current.setPhase(idx);
-      G.b.hp = cfg.hp;
-      G.b.max = cfg.hp;
+      G.b.max = BOSS_HP;
+      G.b.hp = Math.round(BOSS_HP * cfg.startFrac);
       G.b.x = 0;
       G.b.z = 22;
       G.b.act = null;
@@ -1146,16 +1156,28 @@ export default function FuriDuel() {
     function damageBoss(amount) {
       const mult = G.b.stagger > 0 ? 2 : 1;
       G.b.hp -= amount * mult;
+      if (G.b.hp < 0) G.b.hp = 0;
+
+      // HPの割合が閾値をまたいだら、戦闘を止めずにその場でPhase（攻撃パターン）を切り替える
+      if (G.b.hp > 0) {
+        const nextPhase = phaseIndexForFrac(G.b.hp / G.b.max);
+        if (nextPhase !== G.phase) {
+          G.phase = nextPhase;
+          setBanner(STAGES[G.stage].phases[nextPhase].name);
+          setTimeout(() => setBanner(null), 1400);
+        }
+      }
+
       if (G.b.hp <= 0) {
         G.b.hp = 0;
         G.running = false;
         G.over = true;
         bossOneShotPlay(BCLIP.death, 1);
         if (bossOneShot) bossOneShot.until = performance.now() + 999999; // 倒れた姿勢を保つ
-        markCleared(G.stage, G.phase);
-        if (G.phase >= PHASE_COUNT - 1 && G.stage >= STAGES.length - 1) {
+        markCleared(G.stage);
+        if (G.stage >= STAGES.length - 1) {
           setScreen("clear");
-        } else if (G.phase >= PHASE_COUNT - 1) {
+        } else {
           // ステージ突破 → 新しいボスへ。ボスが切り替わってからバナーを出す
           const ns = G.stage + 1;
           setTimeout(() => {
@@ -1167,16 +1189,6 @@ export default function FuriDuel() {
               setTimeout(() => setBanner(null), 1400);
             }, 500);
           }, 2200);
-        } else {
-          // Phaseが切り替わってからバナーを出す
-          const npIdx = G.phase + 1;
-          setTimeout(() => {
-            resetPhase(npIdx);
-            setTimeout(() => {
-              setBanner(STAGES[G.stage].phases[npIdx].name);
-              setTimeout(() => setBanner(null), 1400);
-            }, 500);
-          }, 1600);
         }
       }
     }
@@ -2772,9 +2784,9 @@ export default function FuriDuel() {
               >
                 ステージセレクト
               </div>
-              {clearedPhases.size === 0 ? (
+              {clearedBosses.size === 0 ? (
                 <div style={{ fontSize: 12, letterSpacing: "0.1em", opacity: 0.6 }}>
-                  まだクリアしたステージがありません
+                  まだ倒したボスがいません
                 </div>
               ) : (
                 <div
@@ -2785,31 +2797,23 @@ export default function FuriDuel() {
                     alignItems: "center",
                   }}
                 >
-                  {STAGES.map((st, si) => {
-                    const clearedInStage = st.phases.filter((ph, pi) => clearedPhases.has(`${si}-${pi}`));
-                    if (clearedInStage.length === 0) return null;
-                    return (
-                      <div key={si} style={{ display: "flex", gap: 8 }}>
-                        {st.phases.map((ph, pi) =>
-                          clearedPhases.has(`${si}-${pi}`) ? (
-                            <div
-                              key={pi}
-                              onClick={() => startAt(si, pi)}
-                              style={{
-                                padding: "8px 16px",
-                                border: "1px solid rgba(237,230,255,0.3)",
-                                fontSize: 12,
-                                letterSpacing: "0.1em",
-                                opacity: 0.8,
-                              }}
-                            >
-                              {st.name} {ph.name}
-                            </div>
-                          ) : null
-                        )}
+                  {STAGES.map((st, si) =>
+                    clearedBosses.has(si) ? (
+                      <div
+                        key={si}
+                        onClick={() => startAt(si, 0)}
+                        style={{
+                          padding: "8px 16px",
+                          border: "1px solid rgba(237,230,255,0.3)",
+                          fontSize: 12,
+                          letterSpacing: "0.1em",
+                          opacity: 0.8,
+                        }}
+                      >
+                        {st.name}
                       </div>
-                    );
-                  })}
+                    ) : null
+                  )}
                 </div>
               )}
               <div

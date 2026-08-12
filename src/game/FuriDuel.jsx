@@ -339,8 +339,6 @@ export default function FuriDuel() {
   const [assets, setAssets] = useState(null);
   const [loadMsg, setLoadMsg] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
-  const [banner, setBanner] = useState(null);
-  const [bannerShow, setBannerShow] = useState(false);
   const [clearedBosses, setClearedBosses] = useState(() => new Set());
   const apiRef = useRef(null);
 
@@ -348,16 +346,6 @@ export default function FuriDuel() {
   function markCleared(stageIdx) {
     setClearedBosses((prev) => (prev.has(stageIdx) ? prev : new Set(prev).add(stageIdx)));
   }
-
-  // バナー文字をフェードインさせる。マウント直後に opacity を 0→1 にするため
-  // 1フレーム遅らせてから表示状態にする。
-  useEffect(() => {
-    if (banner) {
-      const id = requestAnimationFrame(() => setBannerShow(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setBannerShow(false);
-  }, [banner]);
 
   // HUD refs (毎フレーム直接DOM更新して再描画を避ける)
   const bossFill = useRef(null);
@@ -1180,12 +1168,11 @@ export default function FuriDuel() {
       if (G.b.hp < 0) G.b.hp = 0;
 
       // HPの割合が閾値をまたいだら、戦闘を止めずにその場でPhase（攻撃パターン）を切り替える
+      // （表示上はPhaseを出さないので、内部の攻撃パターン切り替えのみ行う）
       if (G.b.hp > 0) {
         const nextPhase = phaseIndexForFrac(G.b.hp / G.b.max);
         if (nextPhase !== G.phase) {
           G.phase = nextPhase;
-          setBanner(STAGES[G.stage].phases[nextPhase].name);
-          setTimeout(() => setBanner(null), 1400);
         }
       }
 
@@ -1199,16 +1186,12 @@ export default function FuriDuel() {
         if (G.stage >= STAGES.length - 1) {
           setScreen("clear");
         } else {
-          // ステージ突破 → 新しいボスへ。ボスが切り替わってからバナーを出す
+          // ステージ突破 → 新しいボスへ
           const ns = G.stage + 1;
           setTimeout(() => {
             G.stage = ns;
             applyStageLook();
             resetPhase(0);
-            setTimeout(() => {
-              setBanner(STAGES[ns].phases[0].name);
-              setTimeout(() => setBanner(null), 1400);
-            }, 500);
           }, 2200);
         }
       }
@@ -2175,7 +2158,7 @@ export default function FuriDuel() {
       }
       if (bossLabel.current) {
         bossLabel.current.textContent =
-          curStage().name + " / " + curPhase().name + "  " + Math.ceil(G.b.hp) + " / " + G.b.max;
+          curStage().name + "  " + Math.ceil(G.b.hp) + " / " + G.b.max;
       }
       for (let i = 0; i < HP_CELLS; i++) {
         const el = heartRefs[i].current;
@@ -2186,9 +2169,9 @@ export default function FuriDuel() {
           el.style.opacity = "1";
           el.style.clipPath = "none";
         } else if (cellHp > 0) {
-          // 〼のように対角線で右下半分だけ残った状態
+          // 〼のように対角線で欠ける。右下から先に減り、左上だけ残った状態
           el.style.opacity = "1";
-          el.style.clipPath = "polygon(0% 100%, 100% 100%, 100% 0%)";
+          el.style.clipPath = "polygon(0% 0%, 100% 0%, 0% 100%)";
         } else {
           // 空
           el.style.opacity = "0";
@@ -2234,16 +2217,12 @@ export default function FuriDuel() {
         G.stage = 0;
         applyStageLook();
         resetPhase(0);
-        setBanner(STAGES[0].phases[0].name);
-        setTimeout(() => setBanner(null), 1400);
       },
       // テストプレイ用: 指定したステージ・Phaseから開始する
       startAt: (stageIdx, phaseIdx) => {
         G.stage = stageIdx;
         applyStageLook();
         resetPhase(phaseIdx);
-        setBanner(STAGES[stageIdx].phases[phaseIdx].name);
-        setTimeout(() => setBanner(null), 1400);
       },
       retry: () => {
         // Continue時は倒しかけの状態を引き継がず、同じボスをHP100%からやり直す
@@ -2700,27 +2679,6 @@ export default function FuriDuel() {
             </div>
           </div>
         </>
-      )}
-
-      {/* ---- バナー ---- */}
-      {banner && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-            opacity: bannerShow ? 1 : 0,
-            transition: "opacity 500ms ease",
-          }}
-        >
-          <div style={{ fontSize: 46, fontWeight: 300, letterSpacing: "0.3em" }}>
-            {banner}
-          </div>
-        </div>
       )}
 
       {/* ---- 読込 / タイトル / ステージセレクト / 死亡 / クリア ---- */}

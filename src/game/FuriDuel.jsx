@@ -2824,9 +2824,6 @@ export default function FuriDuel() {
               <div style={{ fontSize: 44, fontWeight: 200, letterSpacing: "0.22em" }}>
                 撃破
               </div>
-              <div style={{ marginTop: 12, fontSize: 12, letterSpacing: "0.3em", opacity: 0.7 }}>
-                三相すべて突破
-              </div>
               <div
                 onClick={() => {
                   setScreen("play");

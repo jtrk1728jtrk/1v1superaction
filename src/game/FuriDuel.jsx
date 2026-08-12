@@ -38,6 +38,10 @@ const BEAM_COUNT = 3; // 同時に出せる光条の本数
 const MINE_MAX = 12; // 伏火の最大数
 const MINE_FUSE = 1.25; // 起爆までの時間
 const MINE_RADIUS = 7.0; // 爆発半径
+const VERDICT_MOVE_TIME = 0.6; // 審問官が中心へ移動する時間
+const VERDICT_CHARGE = 2.2; // 中心到達後、発動までの溜め時間（安全範囲を早めに見せ、移動が間に合うよう長めに確保）
+const VERDICT_SAFE_HALF_ANGLE = Math.PI / 8; // 安全範囲の半角（合計45度）
+const VERDICT_DMG = 4; // 発動時のダメージ
 const BOSS_SWING_RANGE = 7.6; // ボスの斬撃が届く距離
 const COMBO_APPROACH = 30; // 連続斬りの接近速度（主人公の20.5より速く）
 const COMBO_HOLD = 5.0; // この距離まで詰めて振る
@@ -862,6 +866,95 @@ export default function FuriDuel() {
       }
       return null;
     }
+
+    /* ---- 審問官: 裁き（中心に移動して無敵化し、フィールドほぼ全体に落雷。安全範囲だけが免れる） ---- */
+    const verdictDanger = new THREE.Mesh(
+      new THREE.CircleGeometry(ARENA_R + 2, 64),
+      new THREE.MeshBasicMaterial({
+        color: C.boss,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    verdictDanger.rotation.x = -Math.PI / 2;
+    verdictDanger.position.y = 0.05;
+    verdictDanger.visible = false;
+    scene.add(verdictDanger);
+
+    // 安全範囲（ランダム45度）。ゲームの角度規約(x=sin(a)*r, z=cos(a)*r)に直接合わせて
+    // 頂点を作るので、回転行列の向きに悩まされずダメージ判定の角度計算とそのまま一致する。
+    const verdictSafe = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({
+        color: C.reflect,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    verdictSafe.renderOrder = 1;
+    verdictSafe.position.y = 0.09;
+    verdictSafe.visible = false;
+    scene.add(verdictSafe);
+
+    function updateVerdictSafeWedge(centerAngle, halfAngle, radius) {
+      const segs = 28;
+      const positions = [0, 0, 0];
+      for (let i = 0; i <= segs; i++) {
+        const a = centerAngle - halfAngle + (i / segs) * halfAngle * 2;
+        positions.push(Math.sin(a) * radius, 0, Math.cos(a) * radius);
+      }
+      const idx = [];
+      for (let i = 1; i <= segs; i++) idx.push(0, i, i + 1);
+      verdictSafe.geometry.dispose();
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geo.setIndex(idx);
+      verdictSafe.geometry = geo;
+    }
+
+    // 発動の瞬間だけ光る落雷エフェクト（安全範囲を避けてランダムに落ちる）
+    const LIGHTNING_COUNT = 14;
+    const lightningBolts = [];
+    for (let i = 0; i < LIGHTNING_COUNT; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.4, 13, 6, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xe8e2ff,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+        })
+      );
+      mesh.position.y = 6.2;
+      mesh.visible = false;
+      scene.add(mesh);
+      lightningBolts.push(mesh);
+    }
+    function spawnLightning(safeAngle, halfAngle) {
+      for (let i = 0; i < LIGHTNING_COUNT; i++) {
+        const b = lightningBolts[i];
+        let a, r;
+        let guard = 0;
+        do {
+          a = Math.random() * Math.PI * 2;
+          r = 4 + Math.random() * (ARENA_R - 2);
+          guard++;
+        } while (
+          guard < 20 &&
+          Math.abs(Math.atan2(Math.sin(a - safeAngle), Math.cos(a - safeAngle))) < halfAngle
+        );
+        b.position.x = Math.sin(a) * r;
+        b.position.z = Math.cos(a) * r;
+        b.visible = true;
+        b.material.opacity = 1;
+        b.scale.set(0.7 + Math.random() * 0.6, 1, 0.7 + Math.random() * 0.6);
+      }
+    }
+
     function clearInquisitorFx() {
       for (let i = 0; i < MINE_MAX; i++) {
         mines[i].alive = false;
@@ -874,6 +967,15 @@ export default function FuriDuel() {
         beams[i].pivot.visible = false;
         beams[i].mesh.material.opacity = 0;
       }
+      verdictDanger.visible = false;
+      verdictDanger.material.opacity = 0;
+      verdictSafe.visible = false;
+      verdictSafe.material.opacity = 0;
+      for (let i = 0; i < LIGHTNING_COUNT; i++) {
+        lightningBolts[i].visible = false;
+        lightningBolts[i].material.opacity = 0;
+      }
+      G.b.invuln = false;
     }
 
     const parryFx = new THREE.Mesh(
@@ -1009,6 +1111,7 @@ export default function FuriDuel() {
         rangedStreak: 0,
         act: null,
         wavePhase: 0,
+        invuln: false, // 審問官の「裁き」中は無敵
       },
     };
 
@@ -1163,6 +1266,7 @@ export default function FuriDuel() {
     };
 
     function damageBoss(amount) {
+      if (G.b.invuln) return;
       const mult = G.b.stagger > 0 ? 2 : 1;
       G.b.hp -= amount * mult;
       if (G.b.hp < 0) G.b.hp = 0;
@@ -1254,6 +1358,18 @@ export default function FuriDuel() {
       // 近づかれたら瞬間移動で仕切り直す
       if (d < 9 && Math.random() < 0.6) return { t: "blink", s: 0, timer: 0.3, k: 0 };
       if (Math.random() < cfg.melee) return { t: "blink", s: 0, timer: 0.3, k: 0 };
+      // 裁き: 中心へ移動して無敵化し、フィールドほぼ全体に落雷（安全範囲45度だけ免れる）
+      if (Math.random() < 0.12 + G.phase * 0.06) {
+        return {
+          t: "verdict",
+          s: 0,
+          timer: VERDICT_MOVE_TIME,
+          k: 0,
+          sx: G.b.x,
+          sz: G.b.z,
+          safeAngle: Math.random() * Math.PI * 2,
+        };
+      }
       const r = Math.random();
       if (G.phase === 0) {
         return r < 0.62
@@ -1486,6 +1602,63 @@ export default function FuriDuel() {
             clearInquisitorFxBeams();
             setBossTint(bossBaseTint, 0);
             endAct(0.8);
+          }
+        }
+      } else if (A.t === "verdict") {
+        // --- 裁き: 中心へ移動して無敵化・赤く発光 → 溜め（安全範囲を早めに表示）→ 全体同時判定 ---
+        if (A.s === 0) {
+          if (A.k === 0) {
+            A.k = 1;
+            G.b.invuln = true;
+          }
+          const k = Math.max(0, Math.min(1, A.timer / VERDICT_MOVE_TIME)); // 1→0
+          G.b.x = A.sx * k;
+          G.b.z = A.sz * k;
+          setBossTint(C.boss, 0.15 + 0.15 * (1 - k));
+          if (A.timer <= 0) {
+            G.b.x = 0;
+            G.b.z = 0;
+            A.s = 1;
+            A.timer = VERDICT_CHARGE;
+            updateVerdictSafeWedge(A.safeAngle, VERDICT_SAFE_HALF_ANGLE, ARENA_R + 2);
+            verdictDanger.material.color.setHex(C.boss);
+            verdictDanger.material.opacity = 0.12;
+            verdictDanger.visible = true;
+            // 安全範囲は溜め開始と同時にはっきり見せる（避ける時間を確保するため早めに出す）
+            verdictSafe.material.opacity = 0.55;
+            verdictSafe.visible = true;
+            const clip = bossActions[BCLIP.wave];
+            const cd = clip ? clip.getClip().duration : VERDICT_CHARGE;
+            bossOneShotPlay(BCLIP.wave, cd / VERDICT_CHARGE);
+          }
+        } else if (A.s === 1) {
+          const k = Math.max(0, A.timer / VERDICT_CHARGE); // 1→0
+          verdictDanger.material.opacity = 0.12 + (1 - k) * 0.4;
+          setBossTint(C.boss, 0.25 + 0.15 * (1 - k));
+          if (A.timer <= 0) {
+            A.s = 2;
+            A.timer = 0.35;
+            G.shake = Math.max(G.shake, 0.9);
+            flash("#e6e0ff", 0.7);
+            verdictDanger.material.color.setHex(0xffffff);
+            verdictDanger.material.opacity = 0.9;
+            spawnLightning(A.safeAngle, VERDICT_SAFE_HALF_ANGLE);
+            if (G.running) {
+              const pAngle = angTo(0, 0, G.p.x, G.p.z);
+              const diff = Math.abs(
+                Math.atan2(Math.sin(pAngle - A.safeAngle), Math.cos(pAngle - A.safeAngle))
+              );
+              if (diff > VERDICT_SAFE_HALF_ANGLE) hurtPlayer(VERDICT_DMG, true);
+            }
+          }
+        } else if (A.s === 2) {
+          verdictDanger.material.opacity = Math.max(0, verdictDanger.material.opacity - dt * 2.6);
+          verdictSafe.material.opacity = Math.max(0, verdictSafe.material.opacity - dt * 2.6);
+          if (A.timer <= 0) {
+            verdictDanger.visible = false;
+            verdictSafe.visible = false;
+            G.b.invuln = false;
+            endAct(0.9);
           }
         }
       } else if (A.t === "mines") {
@@ -2062,6 +2235,13 @@ export default function FuriDuel() {
         healFx.scale.setScalar(healFx.scale.x + dt * 7);
         healFx.material.opacity = Math.max(0, healFx.material.opacity - dt * 2.2);
         if (healFx.material.opacity <= 0) healFx.scale.setScalar(1);
+      }
+      for (let i = 0; i < LIGHTNING_COUNT; i++) {
+        const b = lightningBolts[i];
+        if (b.material.opacity > 0) {
+          b.material.opacity = Math.max(0, b.material.opacity - dt * 3.2);
+          if (b.material.opacity <= 0) b.visible = false;
+        }
       }
       if (flashRef.current) {
         const cur = parseFloat(flashRef.current.style.opacity || "0");

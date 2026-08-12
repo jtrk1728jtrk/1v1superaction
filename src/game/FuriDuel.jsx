@@ -321,7 +321,18 @@ export default function FuriDuel() {
   const [loadMsg, setLoadMsg] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [bannerShow, setBannerShow] = useState(false);
   const apiRef = useRef(null);
+
+  // バナー文字をフェードインさせる。マウント直後に opacity を 0→1 にするため
+  // 1フレーム遅らせてから表示状態にする。
+  useEffect(() => {
+    if (banner) {
+      const id = requestAnimationFrame(() => setBannerShow(true));
+      return () => cancelAnimationFrame(id);
+    }
+    setBannerShow(false);
+  }, [banner]);
 
   // HUD refs (毎フレーム直接DOM更新して再描画を避ける)
   const bossFill = useRef(null);
@@ -1133,21 +1144,26 @@ export default function FuriDuel() {
         if (G.phase >= PHASE_COUNT - 1 && G.stage >= STAGES.length - 1) {
           setScreen("clear");
         } else if (G.phase >= PHASE_COUNT - 1) {
-          // ステージ突破 → 新しいボスへ
+          // ステージ突破 → 新しいボスへ。ボスが切り替わってからバナーを出す
           const ns = G.stage + 1;
-          setBanner(STAGES[ns].phases[0].name);
           setTimeout(() => {
             G.stage = ns;
             applyStageLook();
             resetPhase(0);
-            setBanner(null);
+            setTimeout(() => {
+              setBanner(STAGES[ns].phases[0].name);
+              setTimeout(() => setBanner(null), 1400);
+            }, 500);
           }, 2200);
         } else {
-          const np = STAGES[G.stage].phases[G.phase + 1];
-          setBanner(np.name);
+          // Phaseが切り替わってからバナーを出す
+          const npIdx = G.phase + 1;
           setTimeout(() => {
-            resetPhase(G.phase + 1);
-            setBanner(null);
+            resetPhase(npIdx);
+            setTimeout(() => {
+              setBanner(STAGES[G.stage].phases[npIdx].name);
+              setTimeout(() => setBanner(null), 1400);
+            }, 500);
           }, 1600);
         }
       }
@@ -1363,7 +1379,7 @@ export default function FuriDuel() {
             const d = clip ? clip.getClip().duration : WAVE_CHARGE;
             bossOneShotPlay(BCLIP.wave, d / WAVE_CHARGE);
           }
-          setBossTint(C.parry, 0.2 + 0.3 * (1 - A.timer / WAVE_CHARGE));
+          setBossTint(C.parry, 0.1 + 0.15 * (1 - A.timer / WAVE_CHARGE));
           const k = Math.max(0, A.timer / WAVE_CHARGE); // 1 → 0
           chargeRing.visible = true;
           chargeRing.position.set(G.b.x, 0.35, G.b.z);
@@ -1389,7 +1405,7 @@ export default function FuriDuel() {
         // --- 光条: 予兆の細い線 → 太い光条が回転する ---
         const arms = G.phase >= 2 ? 3 : 2;
         if (A.s === 0) {
-          setBossTint(C.parry, 0.4);
+          setBossTint(C.parry, 0.2);
           bossPlayBase(BCLIP.ready);
           for (let i = 0; i < arms; i++) {
             const b = beams[i];
@@ -1447,7 +1463,7 @@ export default function FuriDuel() {
       } else if (A.t === "homing") {
         // --- 追尾弾: 遅いが追ってくる。撃ち落とせる ---
         if (A.timer <= 0) {
-          const n = 3; // 終相でも発射数は増やさない（多すぎるとの声に合わせて据え置き）
+          const n = 2; // 全体的に多いとの声を受けて削減
           const base = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
           for (let i = 0; i < n; i++) {
             const a = base + (i - (n - 1) / 2) * 0.55;
@@ -1480,7 +1496,7 @@ export default function FuriDuel() {
         } else if (A.s === 1) {
           const k = 1 - Math.max(0, A.timer / 0.42);
           bossGroup.scale.setScalar(curStage().scale * Math.min(1, k * 1.6));
-          setBossTint(C.parry, 0.45);
+          setBossTint(C.parry, 0.22);
           bossPlayBase(BCLIP.ready);
           if (A.timer <= 0) {
             A.s = 2;
@@ -1526,7 +1542,7 @@ export default function FuriDuel() {
         if (A.timer <= 0) endAct(0.35);
       } else if (A.t === "rush") {
         if (A.s === 0) {
-          setBossTint(C.parry, 0.4);
+          setBossTint(C.parry, 0.2);
           bossPlayBase(BCLIP.ready);
           // 溜めの間はわずかに後ろへ引く（踏み込みの助走に見せる）
           const pull = Math.min(1, A.timer / 0.3) * 4.5;
@@ -1570,7 +1586,7 @@ export default function FuriDuel() {
       } else if (A.t === "combo") {
         if (A.s === 0) {
           // --- 構え。主人公より速く詰めないと永久に追いつけない ---
-          setBossTint(C.parry, 0.4);
+          setBossTint(C.parry, 0.2);
           bossPlayBase(BCLIP.ready);
           if (dToP > COMBO_HOLD) {
             const mv = Math.min(dToP - COMBO_HOLD, 1) * COMBO_APPROACH * sp;
@@ -2396,27 +2412,25 @@ export default function FuriDuel() {
         {musicOn ? "♪" : "♪̸"}
       </div>
 
-      {/* ---- テストプレイ用: ステージセレクトへの入口 ---- */}
-      {screen === "title" && (
-        <div
-          onClick={() => setScreen("stageSelect")}
-          style={{
-            position: "absolute",
-            top: 14,
-            left: 14,
-            padding: "8px 14px",
-            border: "1px solid rgba(237,230,255,0.3)",
-            borderRadius: 6,
-            background: "rgba(237,230,255,0.06)",
-            fontSize: 11,
-            letterSpacing: "0.15em",
-            opacity: 0.8,
-            zIndex: 5,
-          }}
-        >
-          ステージセレクト
-        </div>
-      )}
+      {/* ---- テストプレイ用: ステージセレクトへの入口（いつでも開ける） ---- */}
+      <div
+        onClick={() => setScreen("stageSelect")}
+        style={{
+          position: "absolute",
+          top: screen === "play" ? 96 : 14,
+          left: 14,
+          padding: "8px 14px",
+          border: "1px solid rgba(237,230,255,0.3)",
+          borderRadius: 6,
+          background: "rgba(237,230,255,0.06)",
+          fontSize: 11,
+          letterSpacing: "0.15em",
+          opacity: 0.8,
+          zIndex: 5,
+        }}
+      >
+        ステージセレクト
+      </div>
 
       {/* ---- 診断表示（原因切り分け用。解決したら消す） ---- */}
       <div
@@ -2603,6 +2617,8 @@ export default function FuriDuel() {
             alignItems: "center",
             justifyContent: "center",
             pointerEvents: "none",
+            opacity: bannerShow ? 1 : 0,
+            transition: "opacity 500ms ease",
           }}
         >
           <div style={{ fontSize: 46, fontWeight: 300, letterSpacing: "0.3em" }}>

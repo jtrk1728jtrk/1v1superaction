@@ -339,6 +339,7 @@ export default function FuriDuel() {
   const diagRef = useRef(null);
   const musicRef = useRef(null);
   const [musicOn, setMusicOn] = useState(true);
+  const [startPressed, setStartPressed] = useState(false);
 
   // 起動時に /public/assets から素材を読み込む
   useEffect(() => {
@@ -1134,7 +1135,7 @@ export default function FuriDuel() {
         } else if (G.phase >= PHASE_COUNT - 1) {
           // ステージ突破 → 新しいボスへ
           const ns = G.stage + 1;
-          setBanner({ big: STAGES[ns].name, small: STAGES[ns].phases[0].sub });
+          setBanner(STAGES[ns].phases[0].name);
           setTimeout(() => {
             G.stage = ns;
             applyStageLook();
@@ -1143,7 +1144,7 @@ export default function FuriDuel() {
           }, 2200);
         } else {
           const np = STAGES[G.stage].phases[G.phase + 1];
-          setBanner({ big: np.name, small: np.sub });
+          setBanner(np.name);
           setTimeout(() => {
             resetPhase(G.phase + 1);
             setBanner(null);
@@ -1408,7 +1409,7 @@ export default function FuriDuel() {
             G.shake = Math.max(G.shake, 0.4);
           }
         } else if (A.s === 1) {
-          A.a += dt * (G.phase >= 2 ? 2.6 : 2.0) * A.dir * sp; // 歩きだけでは避けきれない速さ。回避ステップ推奨
+          A.a += dt * (G.phase >= 2 ? 2.2 : 2.0) * A.dir * sp; // 歩きだけでは避けきれない速さ。回避ステップ推奨
           for (let i = 0; i < arms; i++) {
             const b = beams[i];
             b.live = true;
@@ -1428,7 +1429,7 @@ export default function FuriDuel() {
       } else if (A.t === "mines") {
         // --- 伏火: 主人公の周囲に時間差の地雷を撒く ---
         if (A.timer <= 0) {
-          const n = G.phase >= 2 ? 4 : 3;
+          const n = 3; // 終相でも撒く数は増やさない（多すぎるとの声に合わせて据え置き）
           for (let i = 0; i < n; i++) {
             const ang = Math.random() * Math.PI * 2;
             const rad = 3 + Math.random() * 12;
@@ -1441,12 +1442,12 @@ export default function FuriDuel() {
           bossOneShotPlay(BCLIP.wave, 1.5);
           A.k++;
           A.timer = 0.55;
-          if (A.k >= (G.phase >= 2 ? 3 : 2)) endAct(0.7);
+          if (A.k >= 2) endAct(G.phase >= 2 ? 0.95 : 0.7);
         }
       } else if (A.t === "homing") {
         // --- 追尾弾: 遅いが追ってくる。撃ち落とせる ---
         if (A.timer <= 0) {
-          const n = G.phase >= 2 ? 4 : 3;
+          const n = 3; // 終相でも発射数は増やさない（多すぎるとの声に合わせて据え置き）
           const base = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
           for (let i = 0; i < n; i++) {
             const a = base + (i - (n - 1) / 2) * 0.55;
@@ -1456,7 +1457,7 @@ export default function FuriDuel() {
           bossOneShotPlay(BCLIP.shoot, 1.4);
           A.k++;
           A.timer = 0.5;
-          if (A.k >= (G.phase >= 2 ? 3 : 2)) endAct(0.65);
+          if (A.k >= 2) endAct(G.phase >= 2 ? 0.9 : 0.65);
         }
       } else if (A.t === "blink") {
         // --- 瞬間移動して斬る ---
@@ -2132,7 +2133,7 @@ export default function FuriDuel() {
         G.stage = 0;
         applyStageLook();
         resetPhase(0);
-        setBanner({ big: STAGES[0].name, small: STAGES[0].phases[0].sub });
+        setBanner(STAGES[0].phases[0].name);
         setTimeout(() => setBanner(null), 1400);
       },
       // テストプレイ用: 指定したステージ・Phaseから開始する
@@ -2140,10 +2141,7 @@ export default function FuriDuel() {
         G.stage = stageIdx;
         applyStageLook();
         resetPhase(phaseIdx);
-        setBanner({
-          big: STAGES[stageIdx].name,
-          small: STAGES[stageIdx].phases[phaseIdx].sub,
-        });
+        setBanner(STAGES[stageIdx].phases[phaseIdx].name);
         setTimeout(() => setBanner(null), 1400);
       },
       retry: () => {
@@ -2398,6 +2396,28 @@ export default function FuriDuel() {
         {musicOn ? "♪" : "♪̸"}
       </div>
 
+      {/* ---- テストプレイ用: ステージセレクトへの入口 ---- */}
+      {screen === "title" && (
+        <div
+          onClick={() => setScreen("stageSelect")}
+          style={{
+            position: "absolute",
+            top: 14,
+            left: 14,
+            padding: "8px 14px",
+            border: "1px solid rgba(237,230,255,0.3)",
+            borderRadius: 6,
+            background: "rgba(237,230,255,0.06)",
+            fontSize: 11,
+            letterSpacing: "0.15em",
+            opacity: 0.8,
+            zIndex: 5,
+          }}
+        >
+          ステージセレクト
+        </div>
+      )}
+
       {/* ---- 診断表示（原因切り分け用。解決したら消す） ---- */}
       <div
         ref={diagRef}
@@ -2586,28 +2606,18 @@ export default function FuriDuel() {
           }}
         >
           <div style={{ fontSize: 46, fontWeight: 300, letterSpacing: "0.3em" }}>
-            {banner.big}
-          </div>
-          <div
-            style={{
-              marginTop: 10,
-              fontSize: 12,
-              letterSpacing: "0.4em",
-              opacity: 0.7,
-            }}
-          >
-            {banner.small}
+            {banner}
           </div>
         </div>
       )}
 
-      {/* ---- 読込 / タイトル / 死亡 / クリア ---- */}
+      {/* ---- 読込 / タイトル / ステージセレクト / 死亡 / クリア ---- */}
       {screen !== "play" && (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: "rgba(11,6,32,0.82)",
+            background: screen === "dead" ? "#000000" : "rgba(11,6,32,0.82)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -2622,23 +2632,13 @@ export default function FuriDuel() {
             <div style={{ touchAction: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
               <div
                 style={{
-                  fontSize: 12,
-                  letterSpacing: "0.5em",
-                  opacity: 0.6,
-                  marginBottom: 14,
-                }}
-              >
-                1 VS 1 DUEL
-              </div>
-              <div
-                style={{
                   fontSize: 46,
                   fontWeight: 200,
                   letterSpacing: "0.18em",
                   lineHeight: 1.1,
                 }}
               >
-                Shadow
+                F-DUEL
               </div>
               <div
                 style={{
@@ -2675,23 +2675,13 @@ export default function FuriDuel() {
             <>
               <div
                 style={{
-                  fontSize: 12,
-                  letterSpacing: "0.5em",
-                  opacity: 0.6,
-                  marginBottom: 14,
-                }}
-              >
-                1 VS 1 DUEL
-              </div>
-              <div
-                style={{
                   fontSize: 52,
                   fontWeight: 200,
                   letterSpacing: "0.18em",
                   lineHeight: 1.1,
                 }}
               >
-                Shadow
+                F-DUEL
               </div>
               <div
                 style={{
@@ -2710,49 +2700,57 @@ export default function FuriDuel() {
               </div>
               <div
                 onClick={start}
+                onPointerDown={() => setStartPressed(true)}
+                onPointerUp={() => setStartPressed(false)}
+                onPointerLeave={() => setStartPressed(false)}
+                onPointerCancel={() => setStartPressed(false)}
                 style={{
                   marginTop: 34,
                   padding: "14px 44px",
                   border: "1px solid rgba(237,230,255,0.5)",
                   letterSpacing: "0.3em",
                   fontSize: 14,
+                  background: startPressed ? "rgba(237,230,255,0.22)" : "transparent",
+                  transform: startPressed ? "scale(0.94)" : "scale(1)",
+                  transition: "transform 90ms ease, background 90ms ease",
                 }}
               >
                 開始
               </div>
-
-              {/* ---- テストプレイ用: ステージ選択 ---- */}
+            </>
+          )}
+          {screen === "stageSelect" && (
+            <div style={{ touchAction: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
               <div
                 style={{
-                  marginTop: 26,
-                  fontSize: 10,
+                  fontSize: 20,
+                  fontWeight: 200,
                   letterSpacing: "0.2em",
-                  opacity: 0.5,
+                  marginBottom: 22,
                 }}
               >
-                — テストプレイ: ステージ選択 —
+                ステージセレクト
               </div>
               <div
                 style={{
-                  marginTop: 10,
                   display: "flex",
                   flexDirection: "column",
-                  gap: 6,
+                  gap: 8,
                   alignItems: "center",
                 }}
               >
                 {STAGES.map((st, si) => (
-                  <div key={si} style={{ display: "flex", gap: 6 }}>
+                  <div key={si} style={{ display: "flex", gap: 8 }}>
                     {st.phases.map((ph, pi) => (
                       <div
                         key={pi}
                         onClick={() => startAt(si, pi)}
                         style={{
-                          padding: "6px 12px",
+                          padding: "8px 16px",
                           border: "1px solid rgba(237,230,255,0.3)",
-                          fontSize: 11,
+                          fontSize: 12,
                           letterSpacing: "0.1em",
-                          opacity: 0.75,
+                          opacity: 0.8,
                         }}
                       >
                         {st.name} {ph.name}
@@ -2761,23 +2759,27 @@ export default function FuriDuel() {
                   </div>
                 ))}
               </div>
-            </>
+              <div
+                onClick={() => setScreen("title")}
+                style={{
+                  marginTop: 30,
+                  fontSize: 12,
+                  letterSpacing: "0.2em",
+                  opacity: 0.6,
+                }}
+              >
+                戻る
+              </div>
+            </div>
           )}
           {screen === "dead" && (
             <>
-              <div style={{ fontSize: 40, fontWeight: 200, letterSpacing: "0.22em" }}>
-                斬られた
-              </div>
-              <div style={{ marginTop: 12, fontSize: 12, letterSpacing: "0.3em", opacity: 0.7 }}>
-                この相の最初から
-              </div>
               <div
                 onClick={() => {
                   setScreen("play");
                   apiRef.current && apiRef.current.retry();
                 }}
                 style={{
-                  marginTop: 30,
                   padding: "14px 44px",
                   border: "1px solid rgba(237,230,255,0.5)",
                   letterSpacing: "0.3em",
@@ -2785,6 +2787,19 @@ export default function FuriDuel() {
                 }}
               >
                 Continue
+              </div>
+              <div
+                onClick={() => setScreen("stageSelect")}
+                style={{
+                  marginTop: 16,
+                  padding: "14px 44px",
+                  border: "1px solid rgba(237,230,255,0.3)",
+                  letterSpacing: "0.3em",
+                  fontSize: 14,
+                  opacity: 0.8,
+                }}
+              >
+                ステージセレクト
               </div>
             </>
           )}

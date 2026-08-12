@@ -121,14 +121,16 @@ async function loadAssets(onProgress) {
   const slash1 = await get("効果音(斬撃1段目)", "audio/slash1.mp3");
   const slash2 = await get("効果音(斬撃2段目)", "audio/slash2.mp3");
   const slash3 = await get("効果音(斬撃3段目)", "audio/slash3.mp3");
-  const parry = await get("効果音(パリィ)", "audio/parry.mp3");
+  const parry = await get("効果音(パリィ受付)", "audio/parry.mp3");
+  const parry2 = await get("効果音(パリィ成功)", "audio/parry2.mp3");
   const dash = await get("効果音(回避)", "audio/dash.mp3");
   const shoot = await get("効果音(射撃)", "audio/shoot.mp3");
+  const enemyDanger = await get("効果音(敵の危険攻撃予兆)", "audio/enemy_danger.mp3");
   return {
     playerGlb,
     bossGlb,
     bgm,
-    sfx: { slash1, slash2, slash3, parry, dash, shoot },
+    sfx: { slash1, slash2, slash3, parry, parry2, dash, shoot, enemyDanger },
   };
 }
 
@@ -210,8 +212,10 @@ function createMusic(assets) {
   decodeInto(assets.sfx.slash2, "slash2");
   decodeInto(assets.sfx.slash3, "slash3");
   decodeInto(assets.sfx.parry, "parry");
+  decodeInto(assets.sfx.parry2, "parry2");
   decodeInto(assets.sfx.dash, "dash");
   decodeInto(assets.sfx.shoot, "shoot");
+  decodeInto(assets.sfx.enemyDanger, "enemyDanger");
 
   let buffer = null;
   let source = null;
@@ -1205,6 +1209,7 @@ export default function FuriDuel() {
       G.slowT = hard ? 0.5 : 0.32;
       G.shake = 0.5;
       flash("#ffd84d", 0.55);
+      if (musicRef.current) musicRef.current.playSfx("parry2");
       parryFx.position.set(G.p.x, 0.5, G.p.z);
       parryFx.material.opacity = 1;
       parryFx.scale.setScalar(0.6);
@@ -1314,6 +1319,10 @@ export default function FuriDuel() {
         G.b.think -= dt * sp;
         if (G.b.think <= 0) {
           G.b.act = chooseAction();
+          // rush・combo は選ばれた瞬間から溜め＝パリィ可能な予兆に入るため、ここで警告音を鳴らす
+          if (G.b.act && (G.b.act.t === "rush" || G.b.act.t === "combo")) {
+            if (musicRef.current) musicRef.current.playSfx("enemyDanger");
+          }
         }
         return;
       }
@@ -1500,6 +1509,8 @@ export default function FuriDuel() {
             G.b.face = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
             A.s = 1;
             A.timer = 0.42;
+            // 着地して構える＝パリィ可能な予兆に入るタイミングで警告音
+            if (musicRef.current) musicRef.current.playSfx("enemyDanger");
           }
         } else if (A.s === 1) {
           const k = 1 - Math.max(0, A.timer / 0.42);
@@ -1640,6 +1651,8 @@ export default function FuriDuel() {
           } else {
             A.s = 0;
             A.timer = 0.42;
+            // 次の一振りの構え＝パリィ可能な予兆に入るタイミングで警告音
+            if (musicRef.current) musicRef.current.playSfx("enemyDanger");
           }
         }
       }

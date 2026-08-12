@@ -322,7 +322,14 @@ export default function FuriDuel() {
   const [loadErr, setLoadErr] = useState(null);
   const [banner, setBanner] = useState(null);
   const [bannerShow, setBannerShow] = useState(false);
+  const [clearedPhases, setClearedPhases] = useState(() => new Set());
   const apiRef = useRef(null);
+
+  // 通常のステージセレクト（ゲームオーバー画面から）はクリア済みのPhaseだけを選べるようにする
+  function markCleared(stageIdx, phaseIdx) {
+    const key = `${stageIdx}-${phaseIdx}`;
+    setClearedPhases((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }
 
   // バナー文字をフェードインさせる。マウント直後に opacity を 0→1 にするため
   // 1フレーム遅らせてから表示状態にする。
@@ -1141,6 +1148,7 @@ export default function FuriDuel() {
         G.over = true;
         bossOneShotPlay(BCLIP.death, 1);
         if (bossOneShot) bossOneShot.until = performance.now() + 999999; // 倒れた姿勢を保つ
+        markCleared(G.stage, G.phase);
         if (G.phase >= PHASE_COUNT - 1 && G.stage >= STAGES.length - 1) {
           setScreen("clear");
         } else if (G.phase >= PHASE_COUNT - 1) {
@@ -2412,9 +2420,9 @@ export default function FuriDuel() {
         {musicOn ? "♪" : "♪̸"}
       </div>
 
-      {/* ---- テストプレイ用: ステージセレクトへの入口（いつでも開ける） ---- */}
+      {/* ---- テストプレイ用: ステージセレクトへの入口（いつでも開ける。クリア状況に関係なく全開放） ---- */}
       <div
-        onClick={() => setScreen("stageSelect")}
+        onClick={() => setScreen("testSelect")}
         style={{
           position: "absolute",
           top: screen === "play" ? 96 : 14,
@@ -2633,7 +2641,7 @@ export default function FuriDuel() {
           style={{
             position: "absolute",
             inset: 0,
-            background: screen === "dead" ? "#000000" : "rgba(11,6,32,0.82)",
+            background: screen === "dead" || screen === "stageSelect" ? "#000000" : "rgba(11,6,32,0.82)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -2746,6 +2754,71 @@ export default function FuriDuel() {
                 }}
               >
                 ステージセレクト
+              </div>
+              {clearedPhases.size === 0 ? (
+                <div style={{ fontSize: 12, letterSpacing: "0.1em", opacity: 0.6 }}>
+                  まだクリアしたステージがありません
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  {STAGES.map((st, si) => {
+                    const clearedInStage = st.phases.filter((ph, pi) => clearedPhases.has(`${si}-${pi}`));
+                    if (clearedInStage.length === 0) return null;
+                    return (
+                      <div key={si} style={{ display: "flex", gap: 8 }}>
+                        {st.phases.map((ph, pi) =>
+                          clearedPhases.has(`${si}-${pi}`) ? (
+                            <div
+                              key={pi}
+                              onClick={() => startAt(si, pi)}
+                              style={{
+                                padding: "8px 16px",
+                                border: "1px solid rgba(237,230,255,0.3)",
+                                fontSize: 12,
+                                letterSpacing: "0.1em",
+                                opacity: 0.8,
+                              }}
+                            >
+                              {st.name} {ph.name}
+                            </div>
+                          ) : null
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div
+                onClick={() => setScreen("dead")}
+                style={{
+                  marginTop: 30,
+                  fontSize: 12,
+                  letterSpacing: "0.2em",
+                  opacity: 0.6,
+                }}
+              >
+                戻る
+              </div>
+            </div>
+          )}
+          {screen === "testSelect" && (
+            <div style={{ touchAction: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 200,
+                  letterSpacing: "0.2em",
+                  marginBottom: 22,
+                }}
+              >
+                テストプレイ：ステージ選択
               </div>
               <div
                 style={{

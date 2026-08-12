@@ -24,6 +24,7 @@ const C = {
   reflect: 0xa9ffee,
   hard: 0xffffff, // 破壊できない弾
   inq: 0x8b5cf6, // 審問官の色
+  heal: 0x4dff88, // ジャストパリィ回復エフェクトの色
 };
 
 const ARENA_R = 44; // フィールド半径（従来の2倍）
@@ -50,6 +51,7 @@ const WAVE_CHARGE = 0.78; // 衝撃波の溜め時間（収束が速い）
 const WAVE_SPEED = 48; // 衝撃波の伝播速度
 const WAVE_FADE = 0.4; // 減衰。フィールド端(最大約88)まで届く寿命になる
 const PARRY_WINDOW = 0.18; // 受付窓
+const JUST_PARRY_WINDOW = 0.06; // ジャストパリィの受付窓（通常より大幅にシビア）
 const PARRY_CD = 0.45; // 硬直
 const MELEE_RANGE = 4.6;
 const MELEE_ARC = Math.PI * 0.55;
@@ -59,7 +61,9 @@ const COMBO_HOMING = 12; // ボスの連続斬りの踏み込み中の軌道補�
 const SHOOT_CD = 0.13;
 const SHOOT_DMG = 1.6;
 const BSPEED = 46;
-const PLAYER_HP = 5;
+const PLAYER_HP = 10;
+const HP_PER_CELL = 2; // ゲージ1個あたりのHP。減った分は縦半分ではなく斜めに欠ける
+const HP_CELLS = PLAYER_HP / HP_PER_CELL;
 const HIT_IFRAME = 1.0;
 const PARRY_IFRAME = 0.8; // パリィ成功後の猶予。直後の追撃で被弾しないように
 const COMBO_WINDOW = 0.75; // この時間内に再入力すれば連撃が繋がる
@@ -897,6 +901,20 @@ export default function FuriDuel() {
     parryFx.position.y = 0.5;
     scene.add(parryFx);
 
+    // ジャストパリィ成功時にだけ出す回復エフェクト（parryFxとは独立に自分のタイミングでフェードする）
+    const healFx = new THREE.Mesh(
+      new THREE.RingGeometry(1.2, 2.4, 40),
+      new THREE.MeshBasicMaterial({
+        color: C.heal,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+      })
+    );
+    healFx.rotation.x = -Math.PI / 2;
+    healFx.position.y = 0.5;
+    scene.add(healFx);
+
     /* ---------------- bullet pool ---------------- */
     const MAXB = 320;
     const bGeoS = new THREE.SphereGeometry(0.32, 8, 6);
@@ -979,6 +997,7 @@ export default function FuriDuel() {
         dashInv: 0, // 回避の無敵（斬撃と衝撃波にのみ有効。弾には効かない）
         hitFlash: 0, // 被弾時の点滅演出。パリィ成功時の無敵では点滅させない
         parry: 0,
+        justParry: 0,
         parryCd: 0,
         melee: 0,
         shoot: 0,
@@ -1028,6 +1047,7 @@ export default function FuriDuel() {
       G.p.dashInv = 0;
       G.p.hitFlash = 0;
       G.p.parry = 0;
+      G.p.justParry = 0;
       G.p.parryCd = 0;
       G.p.combo = 0;
       G.p.comboT = 0;
@@ -1054,6 +1074,7 @@ export default function FuriDuel() {
       slash.material.opacity = 0;
       pSlash.material.opacity = 0;
       parryFx.material.opacity = 0;
+      healFx.material.opacity = 0;
       setBossTint(bossBaseTint, 0);
       G.shake = 0;
       G.slowT = 0;
@@ -1214,8 +1235,9 @@ export default function FuriDuel() {
       }
     }
 
-    function onParrySuccess(hard) {
+    function onParrySuccess(hard, just) {
       G.p.parry = 0;
+      G.p.justParry = 0;
       // 直後の追撃で被弾しないよう猶予を与える（崩し成功時はさらに長め）
       G.p.inv = Math.max(G.p.inv, hard ? PARRY_IFRAME * 1.6 : PARRY_IFRAME);
       G.slowT = hard ? 0.5 : 0.32;
@@ -1231,6 +1253,14 @@ export default function FuriDuel() {
         G.b.staggerMax = 1.1;
         G.b.act = null;
         damageBoss(4);
+      }
+      // ジャストタイミング（通常より大幅にシビアな受付窓）で成功した場合はHP1回復し、緑のエフェクトを出す
+      if (just) {
+        if (G.p.hp < PLAYER_HP) G.p.hp = Math.min(PLAYER_HP, G.p.hp + 1);
+        healFx.position.set(G.p.x, 0.5, G.p.z);
+        healFx.material.opacity = 1;
+        healFx.scale.setScalar(0.6);
+        flash("#4dff88", 0.6);
       }
     }
 
@@ -1695,7 +1725,7 @@ export default function FuriDuel() {
       const a = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
       const diff = Math.abs(Math.atan2(Math.sin(a - G.b.face), Math.cos(a - G.b.face)));
       if (d < BOSS_SWING_RANGE && diff < MELEE_ARC / 2 + 0.25) {
-        if (G.p.parry > 0) onParrySuccess(true);
+        if (G.p.parry > 0) onParrySuccess(true, G.p.justParry > 0);
         else hurtPlayer(1, true);
       }
       G.shake = Math.max(G.shake, 0.35);
@@ -1719,6 +1749,7 @@ export default function FuriDuel() {
       P.dashInv -= dt;
       P.hitFlash -= dt;
       if (P.parry > 0) P.parry -= dt;
+      if (P.justParry > 0) P.justParry -= dt;
 
       // カメラ前方 f と、その画面右 r = cross(f, up)
       const fx = Math.sin(camF),
@@ -1795,6 +1826,7 @@ export default function FuriDuel() {
 
       if (input.parry && P.parryCd <= 0) {
         P.parry = PARRY_WINDOW;
+        P.justParry = JUST_PARRY_WINDOW;
         P.parryCd = PARRY_CD;
         triggerOneShot(CLIP.parry, 2.4, false); // 0.83s を約0.35sに圧縮
         if (musicRef.current) musicRef.current.playSfx("parry");
@@ -2043,6 +2075,11 @@ export default function FuriDuel() {
         parryFx.material.opacity = Math.max(0, parryFx.material.opacity - dt * 2.2);
         if (parryFx.material.opacity <= 0) parryFx.scale.setScalar(1);
       }
+      if (healFx.material.opacity > 0) {
+        healFx.scale.setScalar(healFx.scale.x + dt * 7);
+        healFx.material.opacity = Math.max(0, healFx.material.opacity - dt * 2.2);
+        if (healFx.material.opacity <= 0) healFx.scale.setScalar(1);
+      }
       if (flashRef.current) {
         const cur = parseFloat(flashRef.current.style.opacity || "0");
         if (cur > 0) flashRef.current.style.opacity = String(Math.max(0, cur - dt * 2.4));
@@ -2140,12 +2177,23 @@ export default function FuriDuel() {
         bossLabel.current.textContent =
           curStage().name + " / " + curPhase().name + "  " + Math.ceil(G.b.hp) + " / " + G.b.max;
       }
-      for (let i = 0; i < PLAYER_HP; i++) {
+      for (let i = 0; i < HP_CELLS; i++) {
         const el = heartRefs[i].current;
         if (!el) continue;
-        const on = i < G.p.hp;
-        el.style.background = on ? "#7ff7e8" : "transparent";
-        el.style.opacity = on ? "1" : "0.28";
+        const cellHp = Math.max(0, Math.min(HP_PER_CELL, G.p.hp - i * HP_PER_CELL));
+        if (cellHp >= HP_PER_CELL) {
+          // 満タン
+          el.style.opacity = "1";
+          el.style.clipPath = "none";
+        } else if (cellHp > 0) {
+          // 〼のように対角線で右下半分だけ残った状態
+          el.style.opacity = "1";
+          el.style.clipPath = "polygon(0% 100%, 100% 100%, 100% 0%)";
+        } else {
+          // 空
+          el.style.opacity = "0";
+          el.style.clipPath = "none";
+        }
       }
       if (dashRing.current)
         dashRing.current.style.opacity = G.p.dashCd > 0 ? "0.3" : "1";
@@ -2198,7 +2246,8 @@ export default function FuriDuel() {
         setTimeout(() => setBanner(null), 1400);
       },
       retry: () => {
-        resetPhase(G.phase);
+        // Continue時は倒しかけの状態を引き継がず、同じボスをHP100%からやり直す
+        resetPhase(0);
       },
       restart: () => {
         G.stage = 0;
@@ -2552,17 +2601,27 @@ export default function FuriDuel() {
             pointerEvents: "none",
           }}
         >
-          {heartRefs.slice(0, PLAYER_HP).map((r, i) => (
+          {heartRefs.slice(0, HP_CELLS).map((r, i) => (
             <div
               key={i}
-              ref={r}
               style={{
-                width: 22,
-                height: 6,
-                background: "#7ff7e8",
+                position: "relative",
+                width: 20,
+                height: 13,
                 border: "1px solid rgba(127,247,232,0.6)",
+                background: "rgba(127,247,232,0.12)",
+                overflow: "hidden",
               }}
-            />
+            >
+              <div
+                ref={r}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "#7ff7e8",
+                }}
+              />
+            </div>
           ))}
         </div>
       )}

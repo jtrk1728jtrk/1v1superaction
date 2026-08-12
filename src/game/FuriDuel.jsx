@@ -1319,8 +1319,12 @@ export default function FuriDuel() {
         G.b.think -= dt * sp;
         if (G.b.think <= 0) {
           G.b.act = chooseAction();
-          // rush・combo は選ばれた瞬間から溜め＝パリィ可能な予兆に入るため、ここで警告音を鳴らす
-          if (G.b.act && (G.b.act.t === "rush" || G.b.act.t === "combo")) {
+          // rush・combo・blink は選ばれた瞬間にパリィ可能な攻撃が確定するため、
+          // 予兆の見た目より前、選択された直後に警告音を鳴らして早めに知らせる
+          if (
+            G.b.act &&
+            (G.b.act.t === "rush" || G.b.act.t === "combo" || G.b.act.t === "blink")
+          ) {
             if (musicRef.current) musicRef.current.playSfx("enemyDanger");
           }
         }
@@ -1509,8 +1513,6 @@ export default function FuriDuel() {
             G.b.face = angTo(G.b.x, G.b.z, G.p.x, G.p.z);
             A.s = 1;
             A.timer = 0.42;
-            // 着地して構える＝パリィ可能な予兆に入るタイミングで警告音
-            if (musicRef.current) musicRef.current.playSfx("enemyDanger");
           }
         } else if (A.s === 1) {
           const k = 1 - Math.max(0, A.timer / 0.42);
@@ -1535,6 +1537,8 @@ export default function FuriDuel() {
           if (G.phase >= 2 && A.k < 2) {
             A.s = 0;
             A.timer = 0.3;
+            // 2撃目もパリィ可能。再びテレポートに入る瞬間に早めの警告音
+            if (musicRef.current) musicRef.current.playSfx("enemyDanger");
           } else {
             endAct(0.75);
           }

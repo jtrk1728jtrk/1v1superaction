@@ -76,7 +76,7 @@ const COMBO_WINDOW = 0.75; // この時間内に再入力すれば連撃が繋�
 const COMBO = [
   { clip: "Sword_Slash", ts: 1.7, cd: 0.17, dmg: 6, windup: 0.05, sfx: "slash1" },
   { clip: "Punch_Left", ts: 1.85, cd: 0.16, dmg: 6, windup: 0.05, sfx: "slash2" },
-  { clip: "Kick_Right", ts: 1.4, cd: 0.34, dmg: 14, windup: 0.10, sfx: "slash3" },
+  { clip: "Sword_Slash", ts: 1.1, cd: 0.34, dmg: 14, windup: 0.10, sfx: "slash3" },
 ];
 // モデルが正面を向く基準がゲーム内の「前方」とズレている場合はここを調整する。
 // 移動時に後ろ向きに歩いて見えたら Math.PI に変更する。
@@ -91,7 +91,7 @@ const BCLIP = {
   shoot: "Gun_Shoot",
   slash: "Sword_Slash",
   slash2: "Punch_Right",
-  slash3: "Kick_Left",
+  slash3: "Sword_Slash",
   wave: "Interact",
   dodge: "Roll",
   hit: "HitRecieve",
